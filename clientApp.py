@@ -11,6 +11,9 @@ from kivy.uix.floatlayout import FloatLayout
 
 from kivy.config import Config
 
+from mySocket import *
+from threading import Thread
+
 # from win32api import GetSystemMetrics
 
 Config.set('graphics', 'width', 1240)
@@ -19,6 +22,28 @@ orange = [1, .6, 0, 1]
 
 
 class ClientApp(App):
+    msg = ''
+
+    def __init__(self, **kwargs):
+        super(ClientApp, self).__init__(**kwargs)
+
+        self.my_socket = MySocket()
+        self.layout = self.prepare_layout()
+        self.listenerThread = Thread(target=self.get_data)
+        self.listenerThread.start()
+
+    def get_data(self):
+        lock = False
+        while True:
+            self.msg = self.my_socket.get_data()
+            if self.msg:
+                if not lock:
+                    self.layout.children[0].children[3].text += self.msg.decode() + " - "
+                    lock = True
+                else:
+                    self.layout.children[0].children[3].text += self.msg.decode() + "\n"
+                    lock = False
+
     def prepare_layout(self):
         parent_bl = BoxLayout(orientation='vertical', spacing=3)
 
@@ -93,19 +118,21 @@ class ClientApp(App):
         return parent_bl
 
     def build(self):
-        layout = self.prepare_layout()
-
-        layout.children[0].children[3].text += ""
-
-        return layout
+        return self.layout
 
     def sending(self, instance):
         if instance.id == "button_send":
             self.sending(instance.parent.children[1])
         else:
-            text = instance.text
+            text = "|User|" + instance.text
             instance.text = ''
-            print(text)
+            if self.my_socket:
+                self.my_socket.send(text)
+
+    def stop(self, *largs):
+        del self.listenerThread
+        self.my_socket.close()
+        super(ClientApp, self).stop(largs)
 
 
 if __name__ == "__main__":
