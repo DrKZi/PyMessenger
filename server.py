@@ -59,18 +59,27 @@ def chat_server():
 
                         if datastr[0] == 'M2':
                             SOCKET_LIST[USERS[datastr[1]]].send("RESP".encode())
-                            SOCKET_LIST[USERS[datastr[2]]].send("RESP".encode())
                             response(datastr[1], datastr[2])
 
                         if datastr[0] == 'DIS':
-                            if SOCKET_LIST[USERS[datastr[1]]]:
-                                del SOCKET_LIST[USERS[datastr[1]]]
-                            if USERS[datastr[1]]:
-                                del USERS[datastr[1]]
-                            broadcast("SYSTEMUser {} leave(died)!".format(datastr[1]))
-                            cleaning(datastr[1])
-                            print("Client {} disconnected".format(addr))
-                            print(all_data)
+                            try:
+                                if SOCKET_LIST[USERS[datastr[1]]]:
+                                    del SOCKET_LIST[USERS[datastr[1]]]
+                                if USERS[datastr[1]]:
+                                    del USERS[datastr[1]]
+                                broadcast("SYSTEMUser {} leave(died)!".format(datastr[1]))
+                                broadcast("DELUSER{}".format(datastr[1]))
+                                cleaning(datastr[1])
+                                print("Client {} disconnected".format(addr))
+                            except KeyError:
+                                id_s = USERS.values()
+                                dels = [i for i in id_s if i not in SOCKET_LIST.keys()]
+                                for i in dels:
+                                    del SOCKET_LIST[i]
+                                print("Client {} disconnected".format(addr))
+
+                        print("All messages:\n", all_data)
+                        print("Users online:\n", USERS)
 
                     except ConnectionResetError:
                         broadcast("SYSTEMUser leave(died) with error!")
@@ -86,8 +95,7 @@ def chat_server():
 def response(you, user):
     for mess in all_data:
         if (mess[0] == you and mess[1] == user) or (mess[0] == user and mess[1] == you):
-            send_last(mess[0], mess[0], mess[2])
-            send_last(mess[1], mess[0], mess[2])
+            send_last(you, mess[0], mess[2])
 
 
 def cleaning(name):
@@ -101,7 +109,7 @@ def cleaning(name):
 def send_last(user, name, mess):
     try:
         SOCKET_LIST[USERS[user]].send(name.encode())
-        time.sleep(0.01)
+        time.sleep(0.001)
         SOCKET_LIST[USERS[user]].send(mess.encode())
     except OSError:
         SOCKET_LIST[USERS[user]].close()
@@ -116,12 +124,10 @@ def broadcast(message):
             try:
                 SOCKET_LIST[socket].send(message.encode())
             except OSError:
-                print("OSERROR")
                 SOCKET_LIST[socket].close()
                 for_del.append(socket)
     for i in for_del:
         del SOCKET_LIST[i]
-
 
 
 if __name__ == "__main__":

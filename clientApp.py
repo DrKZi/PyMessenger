@@ -36,11 +36,14 @@ class ClientApp(App):
         self.layout = self.prepare_layout()
 
         self.my_socket = MySocket()
-        self.listenerThread = Thread(target=self.get_data)
-        self.listenerThread.start()
+        if not self.my_socket.con:
+            self.stop()
+        else:
+            self.listenerThread = Thread(target=self.get_data)
+            self.listenerThread.start()
 
-        self.popup = Popup()
-        self.get_popup()
+            self.popup = Popup()
+            self.get_popup()
 
     def get_data(self):
         time.sleep(1)
@@ -55,6 +58,8 @@ class ClientApp(App):
                                                                             height=50,
                                                                             allow_no_selection=False
                                                                             ))
+            elif self.msg[:7] == "DELUSER":
+                Thread(target=self._deleting_user(self.msg[7:])).start()
             elif self.msg[:6] == "SYSTEM":
                 self.layout.children[0].children[3].text += "SYSTEM - "
                 self.layout.children[0].children[3].text += self.msg[6:] + "\n"
@@ -152,8 +157,9 @@ class ClientApp(App):
                 self.my_socket.send(self.to, text)
 
     def stop(self, *largs):
-        del self.listenerThread
-        self.my_socket.close()
+        if self.my_socket.con:
+            del self.listenerThread
+            self.my_socket.close()
         super(ClientApp, self).stop(largs)
 
     def _username(self):
@@ -196,6 +202,12 @@ class ClientApp(App):
     def _toggle(self, instance):
         self.to = instance.text
         self.my_socket.select_user(self.to)
+
+    def _deleting_user(self, name):
+        print("del")
+        for i in self.layout.children[0].children[2].children:
+            if i.text == name:
+                self.layout.children[0].children[2].remove_widget(i)
 
 
 if __name__ == "__main__":

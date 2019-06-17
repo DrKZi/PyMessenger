@@ -4,8 +4,13 @@ import socket
 class MySocket:
     def __init__(self):
         self.sock = socket.socket()
-        self.sock.connect(("127.0.0.1", 8000))
-        self.id = self.sock.recv(4096).decode()[8:]
+        try:
+            self.sock.connect(("127.0.0.1", 8000))
+            self.id = self.sock.recv(4096).decode()[8:]
+            self.con = True
+        except ConnectionRefusedError:
+            self.con = False
+            print("Cannot connect to server!")
         self.name = ""
 
     def get_data(self):
