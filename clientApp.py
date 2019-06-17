@@ -3,6 +3,7 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
+from kivy.uix.popup import Popup
 
 from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
@@ -10,9 +11,11 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.floatlayout import FloatLayout
 
 from kivy.config import Config
+from kivy.clock import Clock
 
 from mySocket import *
 from threading import Thread
+import time
 
 # from win32api import GetSystemMetrics
 
@@ -23,16 +26,22 @@ orange = [1, .6, 0, 1]
 
 class ClientApp(App):
     msg = ''
+    user = ''
 
     def __init__(self, **kwargs):
         super(ClientApp, self).__init__(**kwargs)
 
-        self.my_socket = MySocket()
         self.layout = self.prepare_layout()
+
+        self.my_socket = MySocket()
         self.listenerThread = Thread(target=self.get_data)
         self.listenerThread.start()
 
+        self.popup = Popup()
+        self.get_popup()
+
     def get_data(self):
+        time.sleep(1)
         lock = False
         while True:
             self.msg = self.my_socket.get_data()
@@ -63,7 +72,7 @@ class ClientApp(App):
                       background_disabled_normal='',
                       bold=True
                       )
-        user_name = Label(text='User', font_size='30sp', size_hint=(.4, .1))
+        user_name = Label(text=self.user, font_size='30sp', size_hint=(.4, .1))
 
         name.add_widget(py)
         name.add_widget(mess)
@@ -72,7 +81,7 @@ class ClientApp(App):
         al_user_name.add_widget(user_name)
 
         gl_top.add_widget(al_name)
-        for i in range(5):
+        for i in range(4):
             gl_top.add_widget(Widget())
         gl_top.add_widget(al_user_name)
 
@@ -124,7 +133,7 @@ class ClientApp(App):
         if instance.id == "button_send":
             self.sending(instance.parent.children[1])
         else:
-            text = "|User|" + instance.text
+            text = self.user + "|" + instance.text
             instance.text = ''
             if self.my_socket:
                 self.my_socket.send(text)
@@ -133,6 +142,42 @@ class ClientApp(App):
         del self.listenerThread
         self.my_socket.close()
         super(ClientApp, self).stop(largs)
+
+    def username(self):
+        self.popup.open()
+
+    def get_popup(self):
+        bl_popup = BoxLayout(orientation='vertical', spacing='10', padding=[30, 20, 30, 20])
+        bl_popup.add_widget(TextInput(font_size='30sp',
+                                      size_hint=(0.75, 0.12),
+                                      pos_hint={'x': 0.1, 'y': 0.4},
+                                      multiline=False,
+                                      on_text_validate=self.set_username
+                                      ))
+        bl_popup.add_widget(Button(text="OK",
+                                   font_size='30sp',
+                                   size_hint=(0.2, 0.1),
+                                   pos_hint={'x': 0.4, 'y': 0.2},
+                                   id='button_ok',
+                                   on_press=self.set_username
+                                   ))
+
+        self.popup = Popup(title='Enter your username!',
+                           content=bl_popup,
+                           size_hint=(None, None),
+                           size=(400, 200),
+                           auto_dismiss=False)
+        Clock.schedule_once(lambda dt: self.username(), 0.1)
+
+    def set_username(self, instance):
+        if instance.id == "button_ok":
+            self.set_username(instance.parent.children[1])
+        else:
+            self.user = instance.text
+            if not self.user:
+                return
+            self.popup.dismiss()
+            self.layout.children[1].children[0].children[0].text = self.user
 
 
 if __name__ == "__main__":
