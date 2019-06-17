@@ -3,6 +3,7 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
+from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.popup import Popup
 
 from kivy.uix.anchorlayout import AnchorLayout
@@ -27,6 +28,7 @@ orange = [1, .6, 0, 1]
 class ClientApp(App):
     msg = ''
     user = ''
+    to = ''
 
     def __init__(self, **kwargs):
         super(ClientApp, self).__init__(**kwargs)
@@ -44,13 +46,26 @@ class ClientApp(App):
         time.sleep(1)
         lock = False
         while True:
-            self.msg = self.my_socket.get_data()
-            if self.msg:
+            self.msg = self.my_socket.get_data().decode()
+            if self.msg[:7] == "USERADD":
+                self.layout.children[0].children[2].add_widget(ToggleButton(text=str(self.msg[7:]),
+                                                                            group="users",
+                                                                            on_release=self._toggle,
+                                                                            size_hint=(1, None),
+                                                                            height=50,
+                                                                            allow_no_selection=False
+                                                                            ))
+            elif self.msg[:6] == "SYSTEM":
+                self.layout.children[0].children[3].text += "SYSTEM - "
+                self.layout.children[0].children[3].text += self.msg[6:] + "\n"
+            elif self.msg == "RESP":
+                self.layout.children[0].children[3].text = ""
+            elif self.msg:
                 if not lock:
-                    self.layout.children[0].children[3].text += self.msg.decode() + " - "
+                    self.layout.children[0].children[3].text += self.msg + " - "
                     lock = True
                 else:
-                    self.layout.children[0].children[3].text += self.msg.decode() + "\n"
+                    self.layout.children[0].children[3].text += self.msg + "\n"
                     lock = False
 
     def prepare_layout(self):
@@ -97,13 +112,11 @@ class ClientApp(App):
                                      pos_hint={'x': .005, 'y': .1},
                                      font_size='20sp'
                                      ))
-        fl_main.add_widget(TextInput(size_hint=(.185, .89),
-                                     disabled=True,
-                                     background_disabled_normal='',
-                                     background_color=[1, 1, 1, .8],
-                                     pos_hint={'x': .81, 'y': .1},
-                                     font_size='30sp'
-                                     ))
+        bl_users = BoxLayout(size_hint=(.185, .89),
+                             orientation="vertical",
+                             pos_hint={'x': .81, 'y': .1},
+                             )
+        fl_main.add_widget(bl_users)
         fl_main.add_widget(TextInput(size_hint=(.795, .09),
                                      pos_hint={'x': .005, 'y': .005},
                                      font_size='30sp',
@@ -133,17 +146,17 @@ class ClientApp(App):
         if instance.id == "button_send":
             self.sending(instance.parent.children[1])
         else:
-            text = self.user + "|" + instance.text
+            text = instance.text
             instance.text = ''
             if self.my_socket:
-                self.my_socket.send(text)
+                self.my_socket.send(self.to, text)
 
     def stop(self, *largs):
         del self.listenerThread
         self.my_socket.close()
         super(ClientApp, self).stop(largs)
 
-    def username(self):
+    def _username(self):
         self.popup.open()
 
     def get_popup(self):
@@ -152,14 +165,14 @@ class ClientApp(App):
                                       size_hint=(0.75, 0.12),
                                       pos_hint={'x': 0.1, 'y': 0.4},
                                       multiline=False,
-                                      on_text_validate=self.set_username
+                                      on_text_validate=self._set_username
                                       ))
         bl_popup.add_widget(Button(text="OK",
                                    font_size='30sp',
                                    size_hint=(0.2, 0.1),
                                    pos_hint={'x': 0.4, 'y': 0.2},
                                    id='button_ok',
-                                   on_press=self.set_username
+                                   on_press=self._set_username
                                    ))
 
         self.popup = Popup(title='Enter your username!',
@@ -167,17 +180,22 @@ class ClientApp(App):
                            size_hint=(None, None),
                            size=(400, 200),
                            auto_dismiss=False)
-        Clock.schedule_once(lambda dt: self.username(), 0.1)
+        Clock.schedule_once(lambda dt: self._username(), 0.1)
 
-    def set_username(self, instance):
+    def _set_username(self, instance):
         if instance.id == "button_ok":
-            self.set_username(instance.parent.children[1])
+            self._set_username(instance.parent.children[1])
         else:
             self.user = instance.text
             if not self.user:
                 return
+            self.my_socket.set_name(self.user)
             self.popup.dismiss()
             self.layout.children[1].children[0].children[0].text = self.user
+
+    def _toggle(self, instance):
+        self.to = instance.text
+        self.my_socket.select_user(self.to)
 
 
 if __name__ == "__main__":
